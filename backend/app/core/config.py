@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 480
 
     frontend_url: str = "http://localhost:5173"
+
+    # Optional: directory of a built frontend (e.g. /app/static in the Docker image).
+    # When present, FastAPI serves the SPA alongside /api. Empty in local development,
+    # where Vite serves the UI and proxies /api.
+    static_dir: str = ""
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # Voice / IVR integration. When credentials are absent the platform runs in

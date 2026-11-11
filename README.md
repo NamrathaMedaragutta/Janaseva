@@ -230,53 +230,45 @@ and Kannada switching with form-data retention.
 
 ## 8. Deployment
 
-The repository is hosted at <https://github.com/NamrathaMedaragutta/Janaseva>. A live deployment
-needs **two** services because GitHub Pages cannot run Python:
+The repository is hosted at <https://github.com/NamrathaMedaragutta/Janaseva>.
 
-* **Backend + PostgreSQL** on any Docker/Python host. `backend/Dockerfile` and `render.yaml` are
-  included for [Render](https://render.com).
-* **Frontend** on any static host. `frontend/vercel.json` is included for [Vercel](https://vercel.com).
+### Easiest: one click on Render (API + UI + database)
 
-Or run the backend as a normal process behind a reverse proxy:
+The root `Dockerfile` builds the React app and serves it **from FastAPI**, so the whole product is a
+single URL — no API base URL, no CORS setup, no second host.
 
-```bash
-cd backend
-.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+1. Sign in to [Render](https://render.com) with GitHub.
+2. **New → Blueprint** → select the `Janaseva` repository → **Apply**.
+3. Wait for the build. Open the service URL, e.g. `https://janaseva.onrender.com`. That's it.
 
-### Render (backend + database)
+`render.yaml` creates the web service and a free PostgreSQL database, injects `DATABASE_URL`, and
+generates `JWT_SECRET_KEY`. Tables are created and demo data seeded on first boot — verify with
+`https://<service>.onrender.com/api/health`. If Render assigns a different service name, update
+`FRONTEND_URL` in the dashboard to match the real URL.
 
-1. Push this repository to GitHub and sign in to Render.
-2. **New → Blueprint**, select the repository. Render reads `render.yaml`, creates the
-   `janaseva-api` web service and `janaseva-db` PostgreSQL database, and injects `DATABASE_URL`
-   (both `postgres://` and `postgresql://` forms are normalised automatically).
-3. When prompted, enter your frontend origin for `CORS_ORIGINS` and `FRONTEND_URL`
-   (for example `https://janaseva.vercel.app`, no trailing slash).
-4. Deploy. Tables are created and demo data seeded on first boot; check
-   `https://<service>.onrender.com/api/health`.
+Free-tier notes: the web service sleeps after inactivity (first request takes ~30–60 s), and the
+free PostgreSQL instance is time-limited and unsuitable for real patient data. Set
+`SEED_DEMO_DATA=false` for a clean instance. The schema is created with SQLAlchemy `create_all()`;
+add a migration workflow (e.g. Alembic) before evolving it in production.
 
-Notes: the free PostgreSQL tier is time-limited and not for production data. Set
-`SEED_DEMO_DATA=false` to start without synthetic records, and replace `generateValue` with a
-managed secret if you rotate keys. The schema is created with SQLAlchemy `create_all()`; add a
-migration workflow (e.g. Alembic) before changing it in production.
+### Any Docker host
 
-### Vercel (frontend)
-
-1. **Add New → Project**, import the repository, and set **Root Directory** to `frontend`.
-   `vercel.json` supplies the Vite build, `dist` output and SPA rewrites for client-side routes.
-2. Add the environment variable `VITE_API_BASE_URL=https://<backend>.onrender.com/api` for
-   Production (and Preview, if you use it), then deploy.
-3. Go back to Render and make sure `CORS_ORIGINS` contains the exact Vercel origin — including any
-   custom domain — otherwise the browser blocks API calls.
-
-### Docker anywhere
+Build from the repository root, because the image compiles the frontend too:
 
 ```bash
-cd backend
-docker build -t janaseva-api .
+docker build -t janaseva .
 docker run -p 8000:8000 -e DATABASE_URL=postgresql://user:pass@host:5432/janaseva \
-  -e JWT_SECRET_KEY=<strong-secret> -e CORS_ORIGINS=https://your-frontend.example janaseva-api
+  -e JWT_SECRET_KEY=<strong-secret> janaseva
 ```
+
+Then open `http://localhost:8000`. Without `DATABASE_URL` the container uses SQLite inside the
+container, which is lost when the container is replaced — use PostgreSQL for anything persistent.
+
+### Split hosting (optional)
+
+`frontend/vercel.json` is still included if you prefer a CDN-hosted UI: deploy `frontend/` to
+Vercel with `VITE_API_BASE_URL=https://<backend>/api`, and set `CORS_ORIGINS` on the backend to the
+exact Vercel origin. The single-service setup above needs none of this.
 
 ### Voice / SMS
 

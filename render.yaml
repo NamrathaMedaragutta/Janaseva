@@ -1,6 +1,5 @@
-# Render blueprint: FastAPI backend + managed PostgreSQL.
-# Create a new Blueprint on Render, point it at this repository, then supply the two
-# prompted values (your Vercel frontend origin, no trailing slash).
+# Render blueprint: one web service (FastAPI API + built React UI) and PostgreSQL.
+# In Render: New -> Blueprint -> select this repository -> Apply. Nothing else to configure.
 databases:
   - name: janaseva-db
     databaseName: janaseva
@@ -9,12 +8,11 @@ databases:
 
 services:
   - type: web
-    name: janaseva-api
-    runtime: python
+    name: janaseva
+    runtime: docker
     plan: free
-    rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
@@ -27,8 +25,6 @@ services:
         generateValue: true
       - key: SEED_DEMO_DATA
         value: "true"
-      # Prompted during Blueprint creation, e.g. https://janaseva.vercel.app
-      - key: CORS_ORIGINS
-        sync: false
+      # Same-origin deployment: update if Render assigns a different service URL.
       - key: FRONTEND_URL
-        sync: false
+        value: https://janaseva.onrender.com

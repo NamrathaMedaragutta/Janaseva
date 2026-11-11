@@ -1,10 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.api import admin, auth, complaints, dashboard, followups, notifications, public, voice
@@ -84,3 +86,24 @@ for router in (
     admin.router,
 ):
     app.include_router(router, prefix=settings.api_prefix)
+
+
+# ------------------------------------------------------------- built frontend
+# Single-service deployments (see Dockerfile) serve the compiled React app from
+# FastAPI, so the API and UI share one origin. Local development leaves
+# STATIC_DIR unset and Vite keeps serving the UI on port 5173.
+_static_dir = Path(settings.static_dir).resolve() if settings.static_dir else None
+if _static_dir and _static_dir.is_dir():
+    _assets_dir = _static_dir / "assets"
+    if _assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_frontend(full_path: str):
+        if full_path.startswith("api"):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+        candidate = (_static_dir / full_path).resolve()
+        if full_path and candidate.is_file() and _static_dir in candidate.parents:
+            return FileResponse(candidate)
+        # Client-side routes (/staff/complaints, /track, ...) fall back to the SPA shell.
+        return FileResponse(_static_dir / "index.html", headers={"Cache-Control": "no-cache"})
