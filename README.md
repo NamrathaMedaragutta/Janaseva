@@ -228,22 +228,61 @@ and Kannada switching with form-data retention.
 
 ---
 
-## 8. Deployment notes
+## 8. Deployment
 
-1. **Database** — provision PostgreSQL and set
-   `DATABASE_URL=postgresql+psycopg://user:password@host:5432/janaseva`. Tables are created on first
-   start. Create a migration workflow (e.g. Alembic) before making production schema changes.
-2. **Secrets** — set a strong `JWT_SECRET_KEY`; never commit `.env`. Set `SEED_DEMO_DATA=false` if
-   you do not want synthetic records in production.
-3. **CORS / origins** — set `CORS_ORIGINS` and `FRONTEND_URL` to the deployed frontend origin.
-4. **Backend** — run behind a reverse proxy:
-   `.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000` (or gunicorn/uvicorn
-   workers). Serve only over HTTPS.
-5. **Frontend** — `npm run build` produces `frontend/dist`. Serve it statically and proxy `/api` to
-   the backend, or set `VITE_API_BASE_URL` to the backend's absolute API URL at build time.
-6. **Voice/SMS** — add provider credentials from `backend/.env.example`; the UI and `/health` switch
-   from `simulation` to `live` automatically. Verify provider webhooks with
-   `VOICE_WEBHOOK_SECRET`.
+The repository is hosted at <https://github.com/NamrathaMedaragutta/Janaseva>. A live deployment
+needs **two** services because GitHub Pages cannot run Python:
+
+* **Backend + PostgreSQL** on any Docker/Python host. `backend/Dockerfile` and `render.yaml` are
+  included for [Render](https://render.com).
+* **Frontend** on any static host. `frontend/vercel.json` is included for [Vercel](https://vercel.com).
+
+Or run the backend as a normal process behind a reverse proxy:
+
+```bash
+cd backend
+.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Render (backend + database)
+
+1. Push this repository to GitHub and sign in to Render.
+2. **New → Blueprint**, select the repository. Render reads `render.yaml`, creates the
+   `janaseva-api` web service and `janaseva-db` PostgreSQL database, and injects `DATABASE_URL`
+   (both `postgres://` and `postgresql://` forms are normalised automatically).
+3. When prompted, enter your frontend origin for `CORS_ORIGINS` and `FRONTEND_URL`
+   (for example `https://janaseva.vercel.app`, no trailing slash).
+4. Deploy. Tables are created and demo data seeded on first boot; check
+   `https://<service>.onrender.com/api/health`.
+
+Notes: the free PostgreSQL tier is time-limited and not for production data. Set
+`SEED_DEMO_DATA=false` to start without synthetic records, and replace `generateValue` with a
+managed secret if you rotate keys. The schema is created with SQLAlchemy `create_all()`; add a
+migration workflow (e.g. Alembic) before changing it in production.
+
+### Vercel (frontend)
+
+1. **Add New → Project**, import the repository, and set **Root Directory** to `frontend`.
+   `vercel.json` supplies the Vite build, `dist` output and SPA rewrites for client-side routes.
+2. Add the environment variable `VITE_API_BASE_URL=https://<backend>.onrender.com/api` for
+   Production (and Preview, if you use it), then deploy.
+3. Go back to Render and make sure `CORS_ORIGINS` contains the exact Vercel origin — including any
+   custom domain — otherwise the browser blocks API calls.
+
+### Docker anywhere
+
+```bash
+cd backend
+docker build -t janaseva-api .
+docker run -p 8000:8000 -e DATABASE_URL=postgresql://user:pass@host:5432/janaseva \
+  -e JWT_SECRET_KEY=<strong-secret> -e CORS_ORIGINS=https://your-frontend.example janaseva-api
+```
+
+### Voice / SMS
+
+Add provider credentials from `backend/.env.example` in the host's environment settings. The UI and
+`/api/health` switch from `simulation` to `live` automatically, and provider webhooks are verified
+with `VOICE_WEBHOOK_SECRET`.
 
 ---
 

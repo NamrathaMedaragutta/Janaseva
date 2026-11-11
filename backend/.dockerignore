@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.db
+*.db-journal
+*.log
+.env
+server.pid
+scripts/__pycache__/

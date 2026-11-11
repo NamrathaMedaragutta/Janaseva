@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -49,6 +50,19 @@ class Settings(BaseSettings):
 
     seed_demo_data: bool = True
     demo_password: str = "Janaseva@123"
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalise_database_url(cls, value: str) -> str:
+        """Accept the URL forms hosting platforms emit (postgres://, postgresql://)
+        and keep SQLite as the default when the variable is blank."""
+        if not value.strip():
+            return f"sqlite:///{(BASE_DIR / 'janaseva.db').as_posix()}"
+        if value.startswith("postgres://"):
+            return "postgresql+psycopg://" + value[len("postgres://") :]
+        if value.startswith("postgresql://"):
+            return "postgresql+psycopg://" + value[len("postgresql://") :]
+        return value
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -1,0 +1,34 @@
+# Render blueprint: FastAPI backend + managed PostgreSQL.
+# Create a new Blueprint on Render, point it at this repository, then supply the two
+# prompted values (your Vercel frontend origin, no trailing slash).
+databases:
+  - name: janaseva-db
+    databaseName: janaseva
+    user: janaseva
+    plan: free
+
+services:
+  - type: web
+    name: janaseva-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: janaseva-db
+          property: connectionString
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: SEED_DEMO_DATA
+        value: "true"
+      # Prompted during Blueprint creation, e.g. https://janaseva.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
